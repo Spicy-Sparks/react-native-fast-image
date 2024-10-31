@@ -2,7 +2,6 @@ import React, { forwardRef, memo } from 'react'
 import {
     View,
     Image,
-    NativeModules,
     requireNativeComponent,
     StyleSheet,
     FlexStyle,
@@ -15,7 +14,12 @@ import {
     AccessibilityProps,
     ViewProps,
     ColorValue,
+    NativeModules,
 } from 'react-native'
+
+import preloaderManager from './PreloaderManager'
+
+const FastImageViewNativeModule = Platform.OS === 'android' ? NativeModules.FastImagePreloaderManager : NativeModules.FastImageView
 
 export type ResizeMode = 'contain' | 'cover' | 'stretch' | 'center'
 
@@ -161,6 +165,14 @@ const resolveDefaultSource = (
     return defaultSource
 }
 
+export interface PreloadProgressHandler {
+    (loaded: number, total: number): void
+}
+
+export interface PreloadCompletionHandler {
+    (loaded: number, skipped: number): void
+}
+
 function FastImageBase({
     source,
     defaultSource,
@@ -242,7 +254,11 @@ export interface FastImageStaticProperties {
     animation: typeof animation
     priority: typeof priority
     cacheControl: typeof cacheControl
-    preload: (sources: Source[]) => void
+    preload: (
+        sources: Source[],
+        onProgress?: PreloadProgressHandler,
+        onComplete?: PreloadCompletionHandler,
+    ) => void
     clearMemoryCache: () => Promise<void>
     clearDiskCache: () => Promise<void>
 }
@@ -258,13 +274,15 @@ FastImage.priority = priority
 
 FastImage.animation = animation
 
-FastImage.preload = (sources: Source[]) =>
-    NativeModules.FastImageView.preload(sources)
+FastImage.preload = (
+    sources: Source[],
+    onProgress?: PreloadProgressHandler,
+    onComplete?: PreloadCompletionHandler,
+) => preloaderManager.preload(sources, onProgress, onComplete)
 
-FastImage.clearMemoryCache = () =>
-    NativeModules.FastImageView.clearMemoryCache()
+FastImage.clearMemoryCache = () => FastImageViewNativeModule.clearMemoryCache()
 
-FastImage.clearDiskCache = () => NativeModules.FastImageView.clearDiskCache()
+FastImage.clearDiskCache = () => FastImageViewNativeModule.clearDiskCache()
 
 const styles = StyleSheet.create({
     imageContainer: {
